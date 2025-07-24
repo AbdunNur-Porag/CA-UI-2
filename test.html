@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GridView with Build API - Flexible Items</title>
+  <style>
+    .grid-view-container {
+      display: grid;
+      padding: 0;
+    }
+
+    .grid-view-item {
+      background-color: lightcoral;
+      text-align: center;
+      border: 1px solid #999;
+      font-size: 18px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+  // CARBON BUILD API
+  function create(tag) {
+    const el = document.createElement(tag);
+
+    const api = {
+      el,
+
+      id(id) {
+        el.id = id;
+        return this;
+      },
+
+      class(classes) {
+        if (Array.isArray(classes)) {
+          el.classList.add(...classes);
+        } else if (typeof classes === "string") {
+          el.classList.add(classes);
+        }
+        return this;
+      },
+
+      attrs(attrObj) {
+        for (const key in attrObj) {
+          el.setAttribute(key, attrObj[key]);
+        }
+        return this;
+      },
+
+      style(styleObj) {
+        Object.assign(el.style, styleObj);
+        return this;
+      },
+
+      event(eventMap) {
+        for (const type in eventMap) {
+          el.addEventListener(type, eventMap[type]);
+        }
+        return this;
+      },
+
+      html(rawHTML) {
+        el.innerHTML = rawHTML;
+        return this;
+      },
+
+      text(textContent) {
+        el.innerText = textContent;
+        return this;
+      },
+
+      add(selector) {
+        const target =
+          typeof selector === "string"
+            ? document.querySelector(selector)
+            : selector instanceof HTMLElement
+            ? selector
+            : null;
+
+        if (target) {
+          target.appendChild(el);
+        }
+        return this;
+      },
+
+      children(childMap) {
+        for (const key in childMap) {
+          const child = childMap[key];
+          if (child && child.el instanceof HTMLElement) {
+            el.appendChild(child.el);
+            this[key] = child; // Attach child to parent
+          }
+        }
+        return this;
+      },
+    };
+
+    return api;
+  }
+
+  // Updated GridView component supporting items as string or create() objects
+  function GridView({
+    id = "gridView",
+    items = [], // can be strings or create() objects
+    Width = "120px",
+    Height = "100px",
+    MarginBetween = "10px",
+    MarginLeft = "10px",
+    MarginTop = "10px",
+    MarginRight = "10px",
+    MarginBottom = "10px",
+    LineGapTop = "0px",
+    LineGapBottom = "0px",
+  }) {
+    const container = create("div")
+      .id(id)
+      .class("grid-view-container")
+      .style({
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${Width}, 1fr))`,
+        columnGap: MarginBetween,
+        rowGap: MarginBetween,
+        marginLeft: MarginLeft,
+        marginTop: MarginTop,
+        marginRight: MarginRight,
+        marginBottom: MarginBottom,
+        paddingTop: "0px",
+        paddingBottom: "0px",
+      });
+
+    const children = {};
+    items.forEach((item, index) => {
+      if (typeof item === "string") {
+        // Plain text item
+        children[`item${index}`] = create("div")
+          .class("grid-view-item")
+          .text(item)
+          .style({
+            height: Height,
+            width: "100%",
+          });
+      } else if (item && item.el instanceof HTMLElement) {
+        // create() object - ensure class & style for grid item
+        item.class("grid-view-item").style({
+          height: Height,
+          width: "100%",
+        });
+        children[`item${index}`] = item;
+      }
+    });
+
+    container.children(children);
+
+   
+
+    // Apply LineGapTop and LineGapBottom if multiple rows exist
+    setTimeout(() => {
+      const rowHeight = container.el.firstChild?.offsetHeight || 0;
+      const totalHeight = container.el.offsetHeight;
+      const rows = Math.floor(
+        totalHeight / (parseInt(Height) + parseInt(MarginBetween))
+      );
+
+      if (rows > 1) {
+        container.style({
+          paddingTop: LineGapTop,
+          paddingBottom: LineGapBottom,
+        });
+      }
+    }, 10);
+
+    return container;
+  }
+
+  // Example usage with mixed items (strings + create() objects)
+  const customItems = [
+    create("button")
+      .text("Button 1")
+      .style({ backgroundColor: "lightblue", border: "none", cursor: "pointer" }),
+
+    create("div").html("<b>Bold Div</b>").style({ color: "darkgreen" }),
+
+    "Simple text item",
+
+    create("img")
+      .attrs({ src: "https://via.placeholder.com/100", alt: "Placeholder" })
+      .style({ display: "block", margin: "auto", borderRadius: "8px" }),
+  ];
+
+  GridView({
+    items: customItems,
+    Width: "100px",
+    Height: "120px",
+    MarginBetween: "5px",
+    MarginLeft: "20px",
+    MarginTop: "20px",
+    MarginRight: "20px",
+    MarginBottom: "20px",
+    LineGapTop: "10px",
+    LineGapBottom: "30px",
+  }).add("#app")
+  
+</script>
+
+</body>
+</html>
