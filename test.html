@@ -1,214 +1,167 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>GridView with Build API - Flexible Items</title>
-  <style>
-    .grid-view-container {
-      display: grid;
-      padding: 0;
-    }
 
-    .grid-view-item {
-      background-color: lightcoral;
-      text-align: center;
-      border: 1px solid #999;
-      font-size: 18px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  </style>
-</head>
-<body>
 
 <div id="app"></div>
 
 <script>
-  // CARBON BUILD API
-  function create(tag) {
-    const el = document.createElement(tag);
-
-    const api = {
-      el,
-
-      id(id) {
-        el.id = id;
-        return this;
-      },
-
-      class(classes) {
-        if (Array.isArray(classes)) {
-          el.classList.add(...classes);
-        } else if (typeof classes === "string") {
-          el.classList.add(classes);
+// === CARBON BUILD API ===
+function create(tag) {
+  const el = document.createElement(tag);
+  const api = {
+    el,
+    id(id) {
+      el.id = id;
+      return this;
+    },
+    class(classes) {
+      if (Array.isArray(classes)) el.classList.add(...classes);
+      else if (typeof classes === "string") el.classList.add(classes);
+      return this;
+    },
+    attrs(attrObj) {
+      for (const key in attrObj) el.setAttribute(key, attrObj[key]);
+      return this;
+    },
+    style(styleObj) {
+      Object.assign(el.style, styleObj);
+      return this;
+    },
+    event(eventMap) {
+      for (const type in eventMap) el.addEventListener(type, eventMap[type]);
+      return this;
+    },
+    html(rawHTML) {
+      el.innerHTML = rawHTML;
+      return this;
+    },
+    text(textContent) {
+      el.innerText = textContent;
+      return this;
+    },
+    add(selector) {
+      const target = typeof selector === "string"
+        ? document.querySelector(selector)
+        : selector instanceof HTMLElement ? selector : null;
+      if (target) target.appendChild(el);
+      return this;
+    },
+    children(childMap) {
+      for (const key in childMap) {
+        const child = childMap[key];
+        if (child && child.el instanceof HTMLElement) {
+          el.appendChild(child.el);
+          this[key] = child;
         }
-        return this;
-      },
+      }
+      return this;
+    },
+  };
+  return api;
+}
 
-      attrs(attrObj) {
-        for (const key in attrObj) {
-          el.setAttribute(key, attrObj[key]);
-        }
-        return this;
-      },
+// === PAGEVIEW ROUTER ===
+const PageRegistry = {};
+let initialSet = false;
+let NotFoundPage = null;
 
-      style(styleObj) {
-        Object.assign(el.style, styleObj);
-        return this;
-      },
+function PageView({ Name, InitialPage = false, Children }) {
+  const view = create("div")
+    .id("page-" + Name)
+    .class(["page-view"])
+    .children(Children);
 
-      event(eventMap) {
-        for (const type in eventMap) {
-          el.addEventListener(type, eventMap[type]);
-        }
-        return this;
-      },
+  PageRegistry[Name] = view;
+  view.add("#app");
 
-      html(rawHTML) {
-        el.innerHTML = rawHTML;
-        return this;
-      },
-
-      text(textContent) {
-        el.innerText = textContent;
-        return this;
-      },
-
-      add(selector) {
-        const target =
-          typeof selector === "string"
-            ? document.querySelector(selector)
-            : selector instanceof HTMLElement
-            ? selector
-            : null;
-
-        if (target) {
-          target.appendChild(el);
-        }
-        return this;
-      },
-
-      children(childMap) {
-        for (const key in childMap) {
-          const child = childMap[key];
-          if (child && child.el instanceof HTMLElement) {
-            el.appendChild(child.el);
-            this[key] = child; // Attach child to parent
-          }
-        }
-        return this;
-      },
-    };
-
-    return api;
+  const current = new URLSearchParams(window.location.search).get("page");
+  if (!initialSet && (current === Name || (!current && InitialPage))) {
+    view.el.classList.add("active");
+    history.replaceState({}, "", "?page=" + Name); // ensure initial state has page
+    initialSet = true;
   }
 
-  // Updated GridView component supporting items as string or create() objects
-  function GridView({
-    id = "gridView",
-    items = [], // can be strings or create() objects
-    Width = "120px",
-    Height = "100px",
-    MarginBetween = "10px",
-    MarginLeft = "10px",
-    MarginTop = "10px",
-    MarginRight = "10px",
-    MarginBottom = "10px",
-    LineGapTop = "0px",
-    LineGapBottom = "0px",
-  }) {
-    const container = create("div")
-      .id(id)
-      .class("grid-view-container")
-      .style({
-        display: "grid",
-        gridTemplateColumns: `repeat(auto-fill, minmax(${Width}, 1fr))`,
-        columnGap: MarginBetween,
-        rowGap: MarginBetween,
-        marginLeft: MarginLeft,
-        marginTop: MarginTop,
-        marginRight: MarginRight,
-        marginBottom: MarginBottom,
-        paddingTop: "0px",
-        paddingBottom: "0px",
-      });
+  return view;
+}
 
-    const children = {};
-    items.forEach((item, index) => {
-      if (typeof item === "string") {
-        // Plain text item
-        children[`item${index}`] = create("div")
-          .class("grid-view-item")
-          .text(item)
-          .style({
-            height: Height,
-            width: "100%",
-          });
-      } else if (item && item.el instanceof HTMLElement) {
-        // create() object - ensure class & style for grid item
-        item.class("grid-view-item").style({
-          height: Height,
-          width: "100%",
-        });
-        children[`item${index}`] = item;
-      }
-    });
+function OpenPageView(name, fromPopState = false) {
+  let found = false;
 
-    container.children(children);
-
-   
-
-    // Apply LineGapTop and LineGapBottom if multiple rows exist
-    setTimeout(() => {
-      const rowHeight = container.el.firstChild?.offsetHeight || 0;
-      const totalHeight = container.el.offsetHeight;
-      const rows = Math.floor(
-        totalHeight / (parseInt(Height) + parseInt(MarginBetween))
-      );
-
-      if (rows > 1) {
-        container.style({
-          paddingTop: LineGapTop,
-          paddingBottom: LineGapBottom,
-        });
-      }
-    }, 10);
-
-    return container;
+  for (const key in PageRegistry) {
+    const page = PageRegistry[key];
+    page.el.classList.remove("active");
+    if (key === name) {
+      page.el.classList.add("active");
+      found = true;
+    }
   }
 
-  // Example usage with mixed items (strings + create() objects)
-  const customItems = [
-    create("button")
-      .text("Button 1")
-      .style({ backgroundColor: "lightblue", border: "none", cursor: "pointer" }),
+  if (!found && NotFoundPage) {
+    for (const key in PageRegistry) PageRegistry[key].el.classList.remove("active");
+    NotFoundPage.el.classList.add("active");
+    if (!fromPopState) {
+      history.pushState({}, "", "?page=notfound");
+    }
+    return;
+  }
 
-    create("div").html("<b>Bold Div</b>").style({ color: "darkgreen" }),
+  if (!fromPopState) {
+    const current = new URLSearchParams(window.location.search).get("page");
+    if (current !== name) {
+      history.pushState({}, "", "?page=" + name);
+    }
+  }
+}
 
-    "Simple text item",
+function BackPageView() {
+  history.back(); // will trigger popstate
+}
 
-    create("img")
-      .attrs({ src: "https://via.placeholder.com/100", alt: "Placeholder" })
-      .style({ display: "block", margin: "auto", borderRadius: "8px" }),
-  ];
+function handlePageFromURL() {
+  const pageName = new URLSearchParams(window.location.search).get("page");
+  OpenPageView(pageName || "", true);
+}
 
-  GridView({
-    items: customItems,
-    Width: "100px",
-    Height: "120px",
-    MarginBetween: "5px",
-    MarginLeft: "20px",
-    MarginTop: "20px",
-    MarginRight: "20px",
-    MarginBottom: "20px",
-    LineGapTop: "10px",
-    LineGapBottom: "30px",
-  }).add("#app")
-  
+window.addEventListener("DOMContentLoaded", handlePageFromURL);
+window.addEventListener("popstate", handlePageFromURL);
 </script>
 
-</body>
-</html>
+<script>
+// === MAIN PAGES ===
+PageView({
+  Name: "home",
+  InitialPage: true,
+  Children: {
+    title: create("h1").text("Home Page"),
+    btn: create("button").text("Go to About").event({
+      click: () => OpenPageView("about")
+    }),
+    back: create("button").text("Back").event({
+      click: () => BackPageView()
+    }),
+  },
+});
+
+PageView({
+  Name: "about",
+  Children: {
+    title: create("h1").text("About Page"),
+    btn: create("button").text("Go to Home").event({
+      click: () => OpenPageView("home")
+    }),
+    back: create("button").text("Back").event({
+      click: () => BackPageView()
+    }),
+  },
+});
+
+// === NOT FOUND PAGE ===
+NotFoundPage = create("div")
+  .id("page-notfound")
+  .class(["page-view"])
+  .children({
+    msg: create("h2").text("❌ Page View Not Found"),
+    back: create("button").text("Back").event({
+      click: () => BackPageView()
+    }),
+  })
+  .add("#app");
+</script>
